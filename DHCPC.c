@@ -39,9 +39,8 @@ enum {
 struct dhcp_option {
     uint8_t id;        // option id
     uint8_t len;       // option length
-    uint8_t data[256]; // option data
+    uint8_t data; 	// option data
 
-    //STAILQ_ENTRY(dhcp_option) pointers; // pointers, see queue(3)
 };
 
 typedef struct dhcp_option dhcp_option_list;
@@ -68,15 +67,18 @@ struct dhcp_message {
 
     uint8_t file[128]; // boot file name
 
-    uint8_t options[312]; // optional parameters field
+  	uint32_t dhcp_magic;
+
+  	
 };
 
 typedef struct dhcp_message dhcp_message;
 
 struct dhcp_msg {
     dhcp_message hdr;
-    //dhcp_option_list opts;
-    uint8_t data[256];
+
+    dhcp_option_list list[32];
+   
 };
 
 typedef struct dhcp_msg dhcp_msg;
@@ -84,12 +86,12 @@ typedef struct dhcp_msg dhcp_msg;
 
 void init_header(struct dhcp_msg *packet, uint8_t type)
 {
- 	
-	memset(packet, 0, sizeof(struct dhcp_msg));
+ 	memset(packet, 0, sizeof(struct dhcp_msg));
+	printf("ggg\n");
 	switch (type) {
 	 
 		case DHCP_DISCOVER:
-			packet->hdr.xid=0x11111111;
+			//packet->hdr.xid=0x11111111;
 		case DHCP_REQUEST:
 		case DHCP_RELEASE:
 		case DHCP_INFORM:
@@ -102,19 +104,45 @@ void init_header(struct dhcp_msg *packet, uint8_t type)
 		
 	
 	}
+	packet->hdr.xid=0x11111111;
 	packet->hdr.htype = ETHERNET;
 	packet->hdr.hlen = ETHERNET_LEN;
 	packet->hdr.hops= 0;
-	
-	packet->hdr.flags=0x0001;
-	packet->hdr.secs=10;
+	//packet->hdr.ciaddr=inet_addr("0.0.0.0");
+	//packet->hdr.yiaddr=inet_addr("255.255.255.255");
+	packet->hdr.ciaddr=0;
+	packet->hdr.yiaddr=0;
+
+	packet->hdr.flags=0x8000;
+	packet->hdr.secs=0x0000;
+    packet->hdr.siaddr=0xffffffff;
+    packet->hdr.giaddr=0; 
+
+    //packet->hdr.chaddr=NULL;
+    //packet->hdr.sname=NULL;
+    //packet->hdr.file=NULL;
+    //packet->list=
+    printf("hhh\n");
+    //packet->list=(dhcp_option_list *)malloc(10);
+    //printf("%d\n",sizeof(dhcp_option_list ) );
+    packet->hdr.dhcp_magic=0x63825363;
+    int length=1;
+    packet->list[30].len=length;
+
+    packet->list[30].id=53;
+   // packet->list[0].data=(uint8_t*)malloc(sizeof(int)*length);
+   	packet->list[30].data=0x05;
+   	printf("%dttt\n",sizeof(packet->list[0].data) );
+    printf("%d\n",errno );
+    packet->list[31].data=0xff;
 	//packet->hdr.chaddr={0x0,0x1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
-	
+
 	//memcpy({1,1,1,1,1,1,1,1},packet->hdr.chaddr,sizeof({1,1,1,1,1,1,1,1}));
 	//packet->cookie = htonl(DHCP_MAGIC);
 	//packet->options[0] = DHCP_END;
 	//packet->opts.len = 255;
-	packet->data[255]=0xff;
+	
+
 
 	//add_simple_option(packet->options, DHCP_MESSAGE_TYPE, type);
 	 
@@ -132,8 +160,12 @@ int main(int argc, char const *argv[])
 	struct ifreq if_eth1;
 	struct sockaddr_in severAddr;
 	struct sockaddr_in clientAddr;
-	dhcp_msg* message;
-	message=(dhcp_msg*)malloc(sizeof(dhcp_msg));
+	struct dhcp_msg* message;
+	//message=(struct dhcp_msg*)malloc(sizeof(struct dhcp_msg));
+
+	memset(message, 0, sizeof(struct dhcp_msg));
+
+	//message=(dhcp_msg*)malloc(sizeof(dhcp_msg));
 
 
 	if ((sock = socket(PF_INET, SOCK_DGRAM, 0)) < 0)	printf("socket() failed.\n");
@@ -154,24 +186,25 @@ int main(int argc, char const *argv[])
 	char *ip;
 	severAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
 	severAddr.sin_port = htons(67);
-	printf("%d\n", errno);
+	
 
 	clientAddr.sin_family = AF_INET;
     
-	clientAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	clientAddr.sin_port = htons(68);
-	printf("%djhjhf\n",clientAddr.sin_addr.s_addr);
-	printf("%d\n", errno);
-	//if ((bind(sock, (struct sockaddr *) &clientAddr,sizeof(clientAddr))) < 0)	printf("bind() failed.\n");
-	printf("%d\n", errno);
+	//clientAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	clientAddr.sin_addr.s_addr =inet_addr("0.0.0.0");
+	clientAddr.sin_port = htons(17777);
+	
+	if ((bind(sock, (struct sockaddr *) &clientAddr,sizeof(clientAddr))) < 0)	printf("bind() failed.\n");
+	
 	//if ((bind(sock, (struct sockaddr *) &severAddr,sizeof(severAddr)) < 0))   printf("bind() failed.\n");
 
-
+	printf("hh\n");
 	sendPacket(DHCP_ACK,message);
-	printf("%d\n",message->hdr.op );
-	if (( sendto(sock,message, sizeof(message), 0, (struct sockaddr *) &severAddr, sizeof(severAddr)))<0) 	printf("send failed\n");
 	
-	
+	printf("%dlen\n",message->list[0].len);
+	if (( sendto(sock,message, sizeof(*message), 0, (struct sockaddr *) &severAddr, sizeof(severAddr)))<0) 	printf("send failed\n");
+	 
+	printf("%dsize\n",sizeof(*message) );
 	close(sock);
 
 	return 0;
@@ -179,8 +212,7 @@ int main(int argc, char const *argv[])
 /*
 problems:
 1. cannot bind port 68  errno 98
-2. how to deal with options
-	
+
 
 
 
