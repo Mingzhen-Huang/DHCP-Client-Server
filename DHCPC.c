@@ -87,7 +87,7 @@ typedef struct dhcp_msg dhcp_msg;
 void init_header(struct dhcp_msg *packet, uint8_t type)
 {
  	memset(packet, 0, sizeof(struct dhcp_msg));
-	printf("ggg\n");
+
 	switch (type) {
 	 
 		case DHCP_DISCOVER:
@@ -122,19 +122,17 @@ void init_header(struct dhcp_msg *packet, uint8_t type)
     //packet->hdr.sname=NULL;
     //packet->hdr.file=NULL;
     //packet->list=
-    printf("hhh\n");
     //packet->list=(dhcp_option_list *)malloc(10);
     //printf("%d\n",sizeof(dhcp_option_list ) );
-    packet->hdr.dhcp_magic=0x63825363;
+    packet->hdr.dhcp_magic=0x63538263;
     int length=1;
-    packet->list[30].len=length;
+    packet->list[0].len=length;
 
-    packet->list[30].id=53;
+    packet->list[0].id=53;
    // packet->list[0].data=(uint8_t*)malloc(sizeof(int)*length);
-   	packet->list[30].data=0x05;
-   	printf("%dttt\n",sizeof(packet->list[0].data) );
-    printf("%d\n",errno );
-    packet->list[31].data=0xff;
+   	packet->list[0].data=0x05;
+
+    packet->list[1].data=0xff;
 	//packet->hdr.chaddr={0x0,0x1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
 
 	//memcpy({1,1,1,1,1,1,1,1},packet->hdr.chaddr,sizeof({1,1,1,1,1,1,1,1}));
@@ -186,7 +184,7 @@ int main(int argc, char const *argv[])
 	char *ip;
 	severAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
 	severAddr.sin_port = htons(67);
-	
+	printf("%d\n", severAddr.sin_addr.s_addr);
 
 	clientAddr.sin_family = AF_INET;
     
@@ -198,13 +196,12 @@ int main(int argc, char const *argv[])
 	
 	//if ((bind(sock, (struct sockaddr *) &severAddr,sizeof(severAddr)) < 0))   printf("bind() failed.\n");
 
-	printf("hh\n");
 	sendPacket(DHCP_ACK,message);
 	
-	printf("%dlen\n",message->list[0].len);
+	//printf("%dlen\n",message->list[0].len);
 	if (( sendto(sock,message, sizeof(*message), 0, (struct sockaddr *) &severAddr, sizeof(severAddr)))<0) 	printf("send failed\n");
 	 
-	printf("%dsize\n",sizeof(*message) );
+	//printf("%dsize\n",sizeof(*message) );
 	close(sock);
 
 	return 0;
@@ -212,8 +209,4 @@ int main(int argc, char const *argv[])
 /*
 problems:
 1. cannot bind port 68  errno 98
-
-
-
-
 */
