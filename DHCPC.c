@@ -86,8 +86,9 @@ typedef struct dhcp_msg dhcp_msg;
 
 void init_header(struct dhcp_msg *packet, uint8_t type)
 {
+	
  	memset(packet, 0, sizeof(struct dhcp_msg));
-
+printf("in\n");
 	switch (type) {
 	 
 		case DHCP_DISCOVER:
@@ -104,6 +105,7 @@ void init_header(struct dhcp_msg *packet, uint8_t type)
 		
 	
 	}
+
 	packet->hdr.xid=0x11111111;
 	packet->hdr.htype = ETHERNET;
 	packet->hdr.hlen = ETHERNET_LEN;
@@ -115,7 +117,7 @@ void init_header(struct dhcp_msg *packet, uint8_t type)
 
 	packet->hdr.flags=0x8000;
 	packet->hdr.secs=0x0000;
-    packet->hdr.siaddr=0xffffffff;
+    packet->hdr.siaddr=0x00000000;
     packet->hdr.giaddr=0; 
 
     //packet->hdr.chaddr=NULL;
@@ -147,45 +149,38 @@ void init_header(struct dhcp_msg *packet, uint8_t type)
 }
 
 
-void sendPacket(uint8_t type,dhcp_msg* packet){
-	init_header(packet,type);
-}
-
-int main(int argc, char const *argv[])
-{
-	int sock; /* Socket descriptor */
-	const int optval=1;
-	struct ifreq if_eth1;
+void sendPacket(uint8_t type,int sock){
 	struct sockaddr_in severAddr;
-	struct sockaddr_in clientAddr;
-	struct dhcp_msg* message;
-	//message=(struct dhcp_msg*)malloc(sizeof(struct dhcp_msg));
-
-	memset(message, 0, sizeof(struct dhcp_msg));
-
-	//message=(dhcp_msg*)malloc(sizeof(dhcp_msg));
-
-
-	if ((sock = socket(PF_INET, SOCK_DGRAM, 0)) < 0)	printf("socket() failed.\n");
-
-
-	strcpy(if_eth1.ifr_name,"eth1");
-	//printf("%s hhh\n",if_eth1.ifr_hwaddr );
-	socklen_t len=sizeof(optval);
-	setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &optval, len);
+	dhcp_msg* message;
 	
-	if(setsockopt(sock, SOL_SOCKET, SO_BROADCAST,(char*)&if_eth1, sizeof(if_eth1))<0)		printf("bind eth1 error\n");
-	
-	
-   
-		
+	message=(dhcp_msg*)malloc(sizeof(dhcp_msg));
+	init_header(message,type);	
 	memset(&severAddr, 0, sizeof(severAddr));
 	severAddr.sin_family = AF_INET; 
 	char *ip;
 	severAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
 	severAddr.sin_port = htons(67);
 	printf("%d\n", severAddr.sin_addr.s_addr);
+	if (( sendto(sock,message, sizeof(*message), 0, (struct sockaddr *) &severAddr, sizeof(severAddr)))<0) 	printf("send failed\n");
+	close(sock);
+}
 
+void seteth1(int sock){
+	int optval=1;
+	struct ifreq if_eth1;
+	strcpy(if_eth1.ifr_name,"eth1");
+	//printf("%s hhh\n",if_eth1.ifr_hwaddr );
+	socklen_t len=sizeof(optval);
+	setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &optval, len);
+	
+	if(setsockopt(sock, SOL_SOCKET, SO_BROADCAST,(char*)&if_eth1, sizeof(if_eth1))<0)		printf("bind eth1 error\n");
+
+}
+int setnbind(){
+	int sock;
+	struct sockaddr_in clientAddr;
+
+	if ((sock = socket(PF_INET, SOCK_DGRAM, 0)) < 0)	printf("socket() failed.\n");
 	clientAddr.sin_family = AF_INET;
     
 	//clientAddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -193,17 +188,39 @@ int main(int argc, char const *argv[])
 	clientAddr.sin_port = htons(17777);
 	
 	if ((bind(sock, (struct sockaddr *) &clientAddr,sizeof(clientAddr))) < 0)	printf("bind() failed.\n");
+	return sock;
+
+}
+int main(int argc, char const *argv[])
+{
+	int sock; /* Socket descriptor */
+	
+	
+	
+	
+
+	sock=setnbind();
+	
+	
+	seteth1(sock);
+
+	
+	
+	
+   
+	
+
+	
 	
 	//if ((bind(sock, (struct sockaddr *) &severAddr,sizeof(severAddr)) < 0))   printf("bind() failed.\n");
 
-	sendPacket(DHCP_ACK,message);
-	
+	sendPacket(DHCP_DISCOVER,sock);
+	printf("%d\n",errno);
 	//printf("%dlen\n",message->list[0].len);
-	if (( sendto(sock,message, sizeof(*message), 0, (struct sockaddr *) &severAddr, sizeof(severAddr)))<0) 	printf("send failed\n");
-	 
+	
 	//printf("%dsize\n",sizeof(*message) );
-	close(sock);
 
+	
 	return 0;
 }
 /*
