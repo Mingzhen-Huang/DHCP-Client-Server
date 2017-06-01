@@ -1,2 +1,3 @@
-# dhcp
-DHCP sever and client by C
+# dhcp 
+* DHCP sever and client by C
+* unfinished
