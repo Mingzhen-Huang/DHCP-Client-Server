@@ -77,7 +77,8 @@ typedef struct dhcp_message dhcp_message;
 struct dhcp_msg {
     dhcp_message hdr;
 
-    dhcp_option_list list[32];
+    //dhcp_option_list list[32];
+    uint8_t *option;
    
 };
 
@@ -92,11 +93,26 @@ printf("in\n");
 	switch (type) {
 	 
 		case DHCP_DISCOVER:
-			//packet->hdr.xid=0x11111111;
+			packet->hdr.xid=0x11111111;
+			packet->hdr.htype = ETHERNET;
+			packet->hdr.hlen = ETHERNET_LEN;
+			packet->hdr.hops= 0;
+			packet->hdr.ciaddr=0;
+			packet->hdr.yiaddr=0;
+			packet->hdr.flags=0x8000;
+			packet->hdr.secs=0x0000;
+		    packet->hdr.siaddr=0x00000000;
+		    packet->hdr.giaddr=0;  
+		    packet->hdr.dhcp_magic=0x63538263;  
+		    packet->option=(uint8_t*)malloc(11*sizeof(uint8_t)); 
+		    printf("%dsize\n",sizeof(packet->option) );
+		    addopt53(packet);
+		    packet->hdr.op = BOOTREQUEST;
+		    break;
 		case DHCP_REQUEST:
 		case DHCP_RELEASE:
 		case DHCP_INFORM:
-		packet->hdr.op = BOOTREQUEST;
+		
 		break;
 		case DHCP_OFFER:
 		case DHCP_ACK:
@@ -106,46 +122,34 @@ printf("in\n");
 	
 	}
 
-	packet->hdr.xid=0x11111111;
-	packet->hdr.htype = ETHERNET;
-	packet->hdr.hlen = ETHERNET_LEN;
-	packet->hdr.hops= 0;
-	//packet->hdr.ciaddr=inet_addr("0.0.0.0");
-	//packet->hdr.yiaddr=inet_addr("255.255.255.255");
-	packet->hdr.ciaddr=0;
-	packet->hdr.yiaddr=0;
+	
+	 
+}
 
-	packet->hdr.flags=0x8000;
-	packet->hdr.secs=0x0000;
-    packet->hdr.siaddr=0x00000000;
-    packet->hdr.giaddr=0; 
-
-    //packet->hdr.chaddr=NULL;
-    //packet->hdr.sname=NULL;
-    //packet->hdr.file=NULL;
-    //packet->list=
-    //packet->list=(dhcp_option_list *)malloc(10);
-    //printf("%d\n",sizeof(dhcp_option_list ) );
-    packet->hdr.dhcp_magic=0x63538263;
-    int length=1;
-    packet->list[0].len=length;
-
-    packet->list[0].id=53;
-   // packet->list[0].data=(uint8_t*)malloc(sizeof(int)*length);
-   	packet->list[0].data=0x05;
-
-    packet->list[1].data=0xff;
-	//packet->hdr.chaddr={0x0,0x1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
-
-	//memcpy({1,1,1,1,1,1,1,1},packet->hdr.chaddr,sizeof({1,1,1,1,1,1,1,1}));
-	//packet->cookie = htonl(DHCP_MAGIC);
-	//packet->options[0] = DHCP_END;
-	//packet->opts.len = 255;
+void addopt53(struct dhcp_msg *packet){
+	printf("%d\n",strlen(packet->option));
+	memset(packet->option, 0, sizeof(packet->option));
+	int length=strlen(packet->option);
+	packet->option[0]=0x35;
+	packet->option[1]=0x01;
+	packet->option[2]=0x05;
+	packet->option[3]=0x05;
+	packet->option[4]=0x05;
+	packet->option[5]=0x05;
+	packet->option[6]=0x05;
+	packet->option[7]=0x05;
+	packet->option[8]=0x05;
+	packet->option[9]=0x05;
+	packet->option[10]=0x05;
 	
 
 
-	//add_simple_option(packet->options, DHCP_MESSAGE_TYPE, type);
-	 
+	/*int length=1;
+    packet->list[0].len=length;
+
+    packet->list[0].id=53;
+   	packet->list[0].data=(uint8_t*)malloc(sizeof(uint8_t)*length);
+   	packet->list[0].data[0]=0x05;*/
 }
 
 
@@ -160,7 +164,7 @@ void sendPacket(uint8_t type,int sock){
 	char *ip;
 	severAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
 	severAddr.sin_port = htons(67);
-	printf("%d\n", severAddr.sin_addr.s_addr);
+	printf("%dms\n", message->option[2]);
 	if (( sendto(sock,message, sizeof(*message), 0, (struct sockaddr *) &severAddr, sizeof(severAddr)))<0) 	printf("send failed\n");
 	close(sock);
 }
@@ -191,6 +195,13 @@ int setnbind(){
 	return sock;
 
 }
+
+void receivePacket(){
+	dhcp_msg* message;
+	struct sockaddr_in clientAddr;
+	unsigned int cliAddrLen;
+	if ((recvMsgSize = recvfrom(sock, echoBuffer,1000,0,(struct sockaddr *) &clientAddr, &cliAddrLen)) < 0) printf("recvfrom() error.\n");
+}
 int main(int argc, char const *argv[])
 {
 	int sock; /* Socket descriptor */
@@ -200,30 +211,12 @@ int main(int argc, char const *argv[])
 	
 
 	sock=setnbind();
-	
-	
 	seteth1(sock);
-
-	
-	
-	
-   
-	
-
-	
-	
-	//if ((bind(sock, (struct sockaddr *) &severAddr,sizeof(severAddr)) < 0))   printf("bind() failed.\n");
-
 	sendPacket(DHCP_DISCOVER,sock);
 	printf("%d\n",errno);
-	//printf("%dlen\n",message->list[0].len);
-	
-	//printf("%dsize\n",sizeof(*message) );
-
-	
 	return 0;
 }
 /*
 problems:
-1. cannot bind port 68  errno 98
+1. message packet data struct error
 */
