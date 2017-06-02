@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <net/if.h>
 #include <errno.h>
+#include <sys/ioctl.h>
 
 enum dhcp_msg_type {
      DHCP_DISCOVER = 1,
@@ -29,17 +30,12 @@ enum hardware_address_types {
     ETHERNET_LEN = 0x06,
 };
 
-/* DHCP message */
-
-enum {
-    DHCP_HEADER_SIZE = 236 // without size of options
-};
 
 
 struct dhcp_option {
     uint8_t id;        // option id
     uint8_t len;       // option length
-    uint8_t data; 	// option data
+    uint8_t *data; 	// option data
 
 };
 
@@ -77,8 +73,8 @@ typedef struct dhcp_message dhcp_message;
 struct dhcp_msg {
     dhcp_message hdr;
 
-    //dhcp_option_list list[32];
-    uint8_t *option;
+    //dhcp_option_list list[10];
+    uint8_t option[256];
    
 };
 
@@ -87,12 +83,14 @@ typedef struct dhcp_msg dhcp_msg;
 
 void init_header(struct dhcp_msg *packet, uint8_t type)
 {
-	
- 	memset(packet, 0, sizeof(struct dhcp_msg));
+		
+
+
 printf("in\n");
 	switch (type) {
 	 
 		case DHCP_DISCOVER:
+			memset(packet, 0, sizeof(struct dhcp_msg));
 			packet->hdr.xid=0x11111111;
 			packet->hdr.htype = ETHERNET;
 			packet->hdr.hlen = ETHERNET_LEN;
@@ -103,11 +101,12 @@ printf("in\n");
 			packet->hdr.secs=0x0000;
 		    packet->hdr.siaddr=0x00000000;
 		    packet->hdr.giaddr=0;  
-		    packet->hdr.dhcp_magic=0x63538263;  
-		    packet->option=(uint8_t*)malloc(11*sizeof(uint8_t)); 
-		    printf("%dsize\n",sizeof(packet->option) );
-		    addopt53(packet);
+		    GetLocalMacAddr(packet->hdr.chaddr);
+		    packet->hdr.dhcp_magic=0x63538263;
 		    packet->hdr.op = BOOTREQUEST;
+		    addopt53(packet);
+		    addopt1(packet);
+		    addopt3(packet);
 		    break;
 		case DHCP_REQUEST:
 		case DHCP_RELEASE:
@@ -127,35 +126,79 @@ printf("in\n");
 }
 
 void addopt53(struct dhcp_msg *packet){
-	printf("%d\n",strlen(packet->option));
-	memset(packet->option, 0, sizeof(packet->option));
+	printf("%dxxx\n",strlen(packet->option));
 	int length=strlen(packet->option);
-	packet->option[0]=0x35;
-	packet->option[1]=0x01;
-	packet->option[2]=0x05;
-	packet->option[3]=0x05;
-	packet->option[4]=0x05;
-	packet->option[5]=0x05;
-	packet->option[6]=0x05;
-	packet->option[7]=0x05;
-	packet->option[8]=0x05;
-	packet->option[9]=0x05;
-	packet->option[10]=0x05;
-	
+	packet->option[length]=0x35;
+	packet->option[length+1]=0x01;
+	packet->option[length+2]=0x01;
 
 
-	/*int length=1;
-    packet->list[0].len=length;
-
-    packet->list[0].id=53;
-   	packet->list[0].data=(uint8_t*)malloc(sizeof(uint8_t)*length);
-   	packet->list[0].data[0]=0x05;*/
 }
 
+void addopt1(struct dhcp_msg *packet){
+	//printf("%d\n",strlen(packet->option));
+	int length=strlen(packet->option);
+	packet->option[length]=0x01 ;
+	packet->option[length+1]=0x04;
+	packet->option[length+2]=0xff;
+	packet->option[length+3]=0xff;
+	packet->option[length+4]=0xff;
+	packet->option[length+5]=0x00;
+	//printf("%d\n",strlen(packet->option) );
+}	
 
-void sendPacket(uint8_t type,int sock){
+void addopt3(struct dhcp_msg *packet){
+
+	int length=strlen(packet->option)+1;
+	//printf("%dlen\n",length );
+	packet->option[length]=0x03 ;
+	packet->option[length+1]=0x04;
+	packet->option[length+2]=0x0a;
+	packet->option[length+3]=0xc3;
+	packet->option[length+4]=0x37;
+	packet->option[length+5]=0x04;
+
+}
+
+void GetLocalMacAddr(uint8_t*szMac)
+{
+  
+  int   sock;   
+  struct   sockaddr_in   sin;   
+  struct   sockaddr   sa;   
+  struct   ifreq   ifr;   
+  unsigned   char   mac[6];  
+
+
+  sock=socket(AF_INET,SOCK_DGRAM,0);   
+  if (sock==-1)   
+  {   
+    perror("socket");     }   
+
+  strncpy(ifr.ifr_name,"eth1",sizeof(ifr.ifr_name));   
+  ifr.ifr_name[IFNAMSIZ-1]   =   0;   
+
+  memset(mac,0,sizeof(mac));   
+  if (ioctl(sock,SIOCGIFHWADDR,&ifr)< 0)   
+  {   
+    perror("ioctl");   
+  }   
+
+  memcpy(&sa,&ifr.ifr_addr,sizeof(sin));   
+  memcpy(mac,sa.sa_data,sizeof(mac));   
+  int curmacstr[64];
+  memset(curmacstr,0,sizeof(curmacstr));
+  sprintf(curmacstr,"%.2X:%.2X:%.2X:%.2X:%.2X:%.2X",mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+ 
+  strcpy(szMac,curmacstr);
+
+  sscanf(curmacstr, "%02x:%02x:%02x:%02x:%02x:%02x ", &szMac[0], &szMac[1], &szMac[2], &szMac[3], &szMac[4], &szMac[5]); 
+
+}
+
+void sendPacket(uint8_t type,int sock,dhcp_msg* message){
 	struct sockaddr_in severAddr;
-	dhcp_msg* message;
+	
 	
 	message=(dhcp_msg*)malloc(sizeof(dhcp_msg));
 	init_header(message,type);	
@@ -164,7 +207,7 @@ void sendPacket(uint8_t type,int sock){
 	char *ip;
 	severAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
 	severAddr.sin_port = htons(67);
-	printf("%dms\n", message->option[2]);
+	//rintf("%dms\n", message->option[2]);
 	if (( sendto(sock,message, sizeof(*message), 0, (struct sockaddr *) &severAddr, sizeof(severAddr)))<0) 	printf("send failed\n");
 	close(sock);
 }
@@ -196,27 +239,28 @@ int setnbind(){
 
 }
 
-void receivePacket(){
+/*void receivePacket(){
 	dhcp_msg* message;
 	struct sockaddr_in clientAddr;
 	unsigned int cliAddrLen;
 	if ((recvMsgSize = recvfrom(sock, echoBuffer,1000,0,(struct sockaddr *) &clientAddr, &cliAddrLen)) < 0) printf("recvfrom() error.\n");
-}
+}*/
 int main(int argc, char const *argv[])
 {
+	dhcp_msg* Dmessage;
 	int sock; /* Socket descriptor */
-	
-	
-	
+	/*int time;
+	if(argv[1]=="sleep"){
+		time=argv[2]-'0';
+	}*/
 	
 
 	sock=setnbind();
 	seteth1(sock);
-	sendPacket(DHCP_DISCOVER,sock);
-	printf("%d\n",errno);
+	sendPacket(DHCP_DISCOVER,sock,Dmessage);
 	return 0;
 }
 /*
 problems:
-1. message packet data struct error
+no error;
 */
