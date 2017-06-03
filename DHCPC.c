@@ -107,6 +107,7 @@ printf("in\n");
 		    addopt53(packet);
 		    addopt1(packet);
 		    addopt3(packet);
+		    addopt51(packet,10);
 		    break;
 		case DHCP_REQUEST:
 		case DHCP_RELEASE:
@@ -143,13 +144,13 @@ void addopt1(struct dhcp_msg *packet){
 	packet->option[length+2]=0xff;
 	packet->option[length+3]=0xff;
 	packet->option[length+4]=0xff;
-	packet->option[length+5]=0x00;
+	packet->option[length+5]=0x80;
 	//printf("%d\n",strlen(packet->option) );
 }	
 
 void addopt3(struct dhcp_msg *packet){
 
-	int length=strlen(packet->option)+1;
+	int length=strlen(packet->option);
 	//printf("%dlen\n",length );
 	packet->option[length]=0x03 ;
 	packet->option[length+1]=0x04;
@@ -157,9 +158,68 @@ void addopt3(struct dhcp_msg *packet){
 	packet->option[length+3]=0xc3;
 	packet->option[length+4]=0x37;
 	packet->option[length+5]=0x04;
-
+	//printf("%dlen\n",length );
 }
 
+void addopt51(struct dhcp_msg *packet,int time){
+	int length=strlen(packet->option);
+	printf("%s\n",packet->option );
+	printf("%dlen\n",length );
+	packet->option[length]=0x33;
+	packet->option[length+1]=0x04;
+	packet->option[length+2]=0;
+	packet->option[length+3]=0;
+	packet->option[length+4]=0;
+	packet->option[length+5]=time;
+}
+
+void addopt54(struct dhcp_msg *packet){
+
+	int length=strlen(packet->option);
+	//printf("%dlen\n",length );
+	packet->option[length]=0x36 ;
+	packet->option[length+1]=0x04;
+	packet->option[length+2]=0x0a;
+	packet->option[length+3]=0xc3;
+	packet->option[length+4]=0x37;
+	packet->option[length+5]=0x04;
+	//printf("%dlen\n",length );
+}
+
+void addopt58(struct dhcp_msg *packet,int time){
+	int length=strlen(packet->option);
+	packet->option[length]=0x3a;
+	packet->option[length+1]=0x04;
+	packet->option[length+2]=0;
+	packet->option[length+3]=0;
+	packet->option[length+4]=0;
+	packet->option[length+5]=time/2;
+}
+void addopt59(struct dhcp_msg *packet,int time){
+	int length=strlen(packet->option);
+	packet->option[length]=0x3b;
+	packet->option[length+1]=0x04;
+	packet->option[length+2]=0;
+	packet->option[length+3]=0;
+	packet->option[length+4]=0;
+	packet->option[length+5]=time/8*7;
+}
+
+void addopt255(struct dhcp_msg *packet){
+	int length=strlen(packet->option);
+	
+	packet->option[length]=0xff ;
+}
+void addopt60(struct dhcp_msg *packet){
+	int length=strlen(packet->option);
+	
+	packet->option[length]=0x3c;
+}
+void addopt55(struct dhcp_msg *packet){
+	int length=strlen(packet->option);
+	
+	packet->option[length]=0x37;
+}
 void GetLocalMacAddr(uint8_t*szMac)
 {
   
@@ -262,5 +322,5 @@ int main(int argc, char const *argv[])
 }
 /*
 problems:
-no error;
+1. message packet data struct error
 */
