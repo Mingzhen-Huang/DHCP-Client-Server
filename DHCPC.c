@@ -8,7 +8,7 @@
 #include <net/if.h>
 #include <errno.h>
 #include <sys/ioctl.h>
-
+#define MAX 512
 enum dhcp_msg_type {
      DHCP_DISCOVER = 1,
      DHCP_OFFER    = 2,
@@ -81,7 +81,7 @@ struct dhcp_msg {
 typedef struct dhcp_msg dhcp_msg;
 
 
-void init_header(struct dhcp_msg *packet, uint8_t type)
+void init_header(struct dhcp_msg *packet, uint8_t type, int time)
 {
 		
 
@@ -91,7 +91,7 @@ printf("in\n");
 	 
 		case DHCP_DISCOVER:
 			memset(packet, 0, sizeof(struct dhcp_msg));
-			packet->hdr.xid=0x11111111;
+			packet->hdr.xid=0x1111111a;
 			packet->hdr.htype = ETHERNET;
 			packet->hdr.hlen = ETHERNET_LEN;
 			packet->hdr.hops= 0;
@@ -104,10 +104,8 @@ printf("in\n");
 		    GetLocalMacAddr(packet->hdr.chaddr);
 		    packet->hdr.dhcp_magic=0x63538263;
 		    packet->hdr.op = BOOTREQUEST;
-		    addopt53(packet);
-		    addopt1(packet);
-		    addopt3(packet);
-		    addopt51(packet,10);
+		    addopt53(packet,type);
+		    
 		    break;
 		case DHCP_REQUEST:
 		case DHCP_RELEASE:
@@ -122,17 +120,23 @@ printf("in\n");
 	
 	}
 
-	
+	printf("%d\n",packet->hdr.xid );
 	 
 }
 
-void addopt53(struct dhcp_msg *packet){
+void addopt53(struct dhcp_msg *packet,int type){
 	printf("%dxxx\n",strlen(packet->option));
 	int length=strlen(packet->option);
 	packet->option[length]=0x35;
 	packet->option[length+1]=0x01;
-	packet->option[length+2]=0x01;
-
+	switch (type) {
+	 
+		case DHCP_DISCOVER:
+			packet->option[length+2]=0x01;
+			break;
+			case DHCP_OFFER:
+			break;
+	}
 
 }
 
@@ -163,8 +167,6 @@ void addopt3(struct dhcp_msg *packet){
 
 void addopt51(struct dhcp_msg *packet,int time){
 	int length=strlen(packet->option);
-	printf("%s\n",packet->option );
-	printf("%dlen\n",length );
 	packet->option[length]=0x33;
 	packet->option[length+1]=0x04;
 	packet->option[length+2]=0;
@@ -235,7 +237,7 @@ void GetLocalMacAddr(uint8_t*szMac)
   {   
     perror("socket");     }   
 
-  strncpy(ifr.ifr_name,"eth1",sizeof(ifr.ifr_name));   
+  strncpy(ifr.ifr_name,"eth2",sizeof(ifr.ifr_name));   
   ifr.ifr_name[IFNAMSIZ-1]   =   0;   
 
   memset(mac,0,sizeof(mac));   
@@ -256,18 +258,18 @@ void GetLocalMacAddr(uint8_t*szMac)
 
 }
 
-void sendPacket(uint8_t type,int sock,dhcp_msg* message){
+void sendPacket(uint8_t type,int sock,dhcp_msg* message,int time){
 	struct sockaddr_in severAddr;
 	
 	
 	message=(dhcp_msg*)malloc(sizeof(dhcp_msg));
-	init_header(message,type);	
+	init_header(message,type,time);	
 	memset(&severAddr, 0, sizeof(severAddr));
 	severAddr.sin_family = AF_INET; 
 	char *ip;
 	severAddr.sin_addr.s_addr = inet_addr("255.255.255.255");
-	severAddr.sin_port = htons(67);
-	//rintf("%dms\n", message->option[2]);
+	severAddr.sin_port = htons(17777);
+	printf("%d\n",sizeof(*message) );
 	if (( sendto(sock,message, sizeof(*message), 0, (struct sockaddr *) &severAddr, sizeof(severAddr)))<0) 	printf("send failed\n");
 	close(sock);
 }
@@ -275,7 +277,7 @@ void sendPacket(uint8_t type,int sock,dhcp_msg* message){
 void seteth1(int sock){
 	int optval=1;
 	struct ifreq if_eth1;
-	strcpy(if_eth1.ifr_name,"eth1");
+	strcpy(if_eth1.ifr_name,"eth2");
 	//printf("%s hhh\n",if_eth1.ifr_hwaddr );
 	socklen_t len=sizeof(optval);
 	setsockopt(sock, SOL_SOCKET, SO_BROADCAST, &optval, len);
@@ -292,32 +294,44 @@ int setnbind(){
     
 	//clientAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	clientAddr.sin_addr.s_addr =inet_addr("0.0.0.0");
-	clientAddr.sin_port = htons(17777);
+	clientAddr.sin_port = htons(17771);
 	
 	if ((bind(sock, (struct sockaddr *) &clientAddr,sizeof(clientAddr))) < 0)	printf("bind() failed.\n");
 	return sock;
 
 }
 
-/*void receivePacket(){
-	dhcp_msg* message;
+struct dhcp_msg* receivePacket(int sock){
+	struct dhcp_msg* message;
 	struct sockaddr_in clientAddr;
-	unsigned int cliAddrLen;
-	if ((recvMsgSize = recvfrom(sock, echoBuffer,1000,0,(struct sockaddr *) &clientAddr, &cliAddrLen)) < 0) printf("recvfrom() error.\n");
-}*/
+	unsigned int cliAddrLen,recvMsgSize;
+	
+	message=(dhcp_msg*)malloc(sizeof(dhcp_msg));
+	memset(message, 0, sizeof(struct dhcp_msg));
+	if ((recvMsgSize = recvfrom(sock,message,MAX,0,(struct sockaddr *) &clientAddr, &cliAddrLen)) < 0) printf("recvfrom() error.\n");
+	close(sock);
+	return message;
+}
+
 int main(int argc, char const *argv[])
 {
-	dhcp_msg* Dmessage;
-	int sock; /* Socket descriptor */
-	/*int time;
-	if(argv[1]=="sleep"){
-		time=argv[2]-'0';
-	}*/
-	
+	//while(1){
+		dhcp_msg* Dmessage,*Omessage;
+		int sock; /* Socket descriptor */
+		int time;
 
-	sock=setnbind();
-	seteth1(sock);
-	sendPacket(DHCP_DISCOVER,sock,Dmessage);
+		if(strcmp(argv[1], "sleep") == 0){
+			time=atoi(argv[2]);	
+		}else{
+			time=50;
+		}	
+		printf("%d\n",time );
+		sock=setnbind();
+		seteth1(sock);
+		sendPacket(DHCP_DISCOVER,sock,Dmessage,time);
+
+
+	//}
 	return 0;
 }
 /*
