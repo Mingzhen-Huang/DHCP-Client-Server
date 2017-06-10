@@ -5,4 +5,7 @@
 ## status
 * unfinished
 ## how to run it
-1. para : sleep Xs
+
+
+
+=== up-to-date after exam===
