@@ -1,9 +1,7 @@
 # DHCP PROGRAM
----
 ## details
-* DHCP sever and client by C
-## status
-* finished
+* This are DHCP sever and client written by C
+
 
 
 
