@@ -1,6 +1,6 @@
 # DHCP PROGRAM
 ## details
-* This are DHCP sever and client written by C
+* There are DHCP sever and client written by C
 
 
 
